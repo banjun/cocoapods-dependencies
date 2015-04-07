@@ -59,7 +59,7 @@ module Pod
             g.node id, label: "#{link_with}#{td.exclusive? ? '' : '[+root]'}"
             td.non_inherited_dependencies.each do |d|
                 dep_id = :"pod#{d.name.gsub(gviz_id_excluded, '')}"
-                g.node dep_id, label: d.name
+                g.node dep_id, label: d.name, style: "filled", fillcolor: hexcolor_for(d.name.split('/', 2).first)
                 g.edge :"#{id}_#{dep_id}", label: d.requirement
             end
           end
@@ -69,7 +69,7 @@ module Pod
               name = parent.split(' ').first
               version = parent.split(' ').last
               dep_id = :"pod#{name.gsub(gviz_id_excluded, '')}"
-              g.node dep_id, label: "#{name} #{version}"
+              g.node dep_id, label: "#{name} #{version}", style: "filled", fillcolor: hexcolor_for(name.split('/', 2).first)
               children.each do |c|
                 c_name, c_requirements = c.split(' ', 2)
                 c_id = :"pod#{c_name.gsub(gviz_id_excluded, '')}"
@@ -80,6 +80,15 @@ module Pod
           g.save("Podfile.graph", :dot)
           g.save("Podfile.graph", :png)
         end
+      end
+
+      def hexcolor_for(string)
+        require 'colorable'
+        require 'digest/sha1'
+        hash = Digest::SHA1.hexdigest(string).hex
+        hue = (hash & 0xff) / 255.0 * 359
+        sat = ((hash & 0xff00) >> 8) / 255.0 * 50 + 10
+        Colorable::Color.new(Colorable::HSB.new(hue.to_i, sat.to_i, 100)).hex
       end
 
       def dependencies
