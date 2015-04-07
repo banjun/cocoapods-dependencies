@@ -47,6 +47,38 @@ module Pod
         UI.title 'Dependencies' do
           require 'yaml'
           UI.puts dependencies.to_yaml
+
+          require 'gviz'
+          gviz_id_excluded = /[^0-9A-Za-z]/
+          g = Gviz.new
+          g.global rankdir: 'LR'
+          targets = @podfile.target_definition_list.map{|td| [(td.link_with || ['root']).join(', '), td]}
+          targets.each do |link_with, td|
+            next if link_with.empty?
+            id = :"linkWith#{link_with}"
+            g.node id, label: "#{link_with}#{td.exclusive? ? '' : '[+root]'}"
+            td.non_inherited_dependencies.each do |d|
+                dep_id = :"pod#{d.name.gsub(gviz_id_excluded, '')}"
+                g.node dep_id, label: d.name
+                g.edge :"#{id}_#{dep_id}", label: d.requirement
+            end
+          end
+          dependencies.each do |d|
+            d = {d => []} if d.kind_of?(String)
+            d.each do |parent, children|
+              name = parent.split(' ').first
+              version = parent.split(' ').last
+              dep_id = :"pod#{name.gsub(gviz_id_excluded, '')}"
+              g.node dep_id, label: "#{name} #{version}"
+              children.each do |c|
+                c_name, c_requirements = c.split(' ', 2)
+                c_id = :"pod#{c_name.gsub(gviz_id_excluded, '')}"
+                g.edge :"#{dep_id}_#{c_id}", label: c_requirements
+              end
+            end
+          end
+          g.save("Podfile.graph", :dot)
+          g.save("Podfile.graph", :png)
         end
       end
 
