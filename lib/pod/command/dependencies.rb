@@ -116,8 +116,13 @@ module Pod
           GraphViz::new(output_file_basename, :type => :digraph, :rankdir => 'LR').tap do |graph|
             dependencies.each do |target, spec_to_deps|
               target_node = graphviz_add_node(graph, target)
-              target.dependencies.each do |d|
+              target.non_inherited_dependencies.each do |d|
                   graph.add_edge(target_node, d.name, color: 'gray')
+              end
+
+              unless target.root?
+                parent_node = graphviz_add_node(graph, target.parent)
+                graph.add_edge(target_node, parent_node, color: 'gray')
               end
 
               spec_to_deps.each do |spec, deps|
@@ -129,7 +134,6 @@ module Pod
                   source_name = if defined?(source.name) then
                                   source.name
                                 else
-                                  binding.pry
                                   spec_to_deps.keys.find do |s|
                                     s.name == spec.root.name && !s.source.nil?
                                   end.source.name
