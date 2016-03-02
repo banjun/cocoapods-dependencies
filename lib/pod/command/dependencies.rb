@@ -109,7 +109,7 @@ module Pod
       def graphviz_data
         @graphviz ||= begin
           require 'graphviz'
-          graph = GraphViz::new(output_file_basename, :type => :digraph)
+          graph = GraphViz::new(output_file_basename, :type => :digraph, :rankdir => "LR")
           root = graph.add_node(output_file_basename)
 
           unless @podspec
