@@ -70,12 +70,16 @@ module Pod
           skip_repo_update = config.skip_repo_update?
           config.integrate_targets = false
           config.skip_repo_update = !@repo_update
-          specs = analyzer.analyze(@repo_update || @podspec).specs_by_target.values.flatten(1)
+          analysis = analyzer.analyze(@repo_update || @podspec)
+          specs_by_target = analysis.specs_by_target
           config.integrate_targets = integrate_targets
           config.skip_repo_update = skip_repo_update
 
-          lockfile = Lockfile.generate(podfile, specs, {})
-          pods = lockfile.to_hash['PODS']
+          deps = specs_by_target.inject({}) do |h, (target, specs)|
+            h[target] = specs.inject({}) {|h, spec| h[spec] = spec.all_dependencies; h}
+            h
+          end
+          deps
         end
       end
 
@@ -109,25 +113,22 @@ module Pod
       def graphviz_data
         @graphviz ||= begin
           require 'graphviz'
-          graph = GraphViz::new(output_file_basename, :type => :digraph, :rankdir => "LR")
-          root = graph.add_node(output_file_basename)
+          GraphViz::new(output_file_basename, :type => :digraph, :rankdir => 'LR').tap do |graph|
+            dependencies.each do |target, spec_to_deps|
+              target_node = graphviz_add_node(graph, target)
+              target.dependencies.each do |d|
+                  graph.add_edge(target_node, d.name, color: 'gray')
+              end
 
-          unless @podspec
-            podfile_dependencies.each do |pod|
-              pod_node = graphviz_add_node(graph, pod)
-              graph.add_edge(root, pod_node)
+              spec_to_deps.each do |spec, deps|
+                spec_node = graphviz_add_node(graph, spec)
+                deps.each do |d|
+                    dep_node = graphviz_add_node(graph, d)
+                    graph.add_edge(spec_node, dep_node)
+                end
+              end
             end
           end
-
-          pod_to_dependencies.each do |pod, dependencies|
-            pod_node = graphviz_add_node(graph, pod)
-            dependencies.each do |dependency|
-              dep_node = graphviz_add_node(graph, dependency)
-              graph.add_edge(pod_node, dep_node)
-            end
-          end
-
-          graph
         end
       end
 
@@ -171,10 +172,17 @@ module Pod
         graphviz_data.output( :dot => "#{output_file_basename}.gv")
       end
 
-      def graphviz_add_node(graph, name)
-          name = sanitized_pod_name(name)
-          rootspec_name = name.split('/', 2).first
-          graph.add_node(name, style: "filled", fillcolor: hexcolor_for_name(rootspec_name))
+      def graphviz_add_node(graph, object)
+        case object.class.to_s
+        when 'Pod::Podfile::TargetDefinition'
+          graph.add_node(object.name)
+        when 'Pod::Specification'
+          spec = object
+          graph.add_node(spec.name, label: spec.to_s, style: "filled", fillcolor: hexcolor_for_name(spec.root.name))
+        when 'Pod::Dependency'
+          dep = Pod::Dependency.from_string(object.name)
+          graph.add_node(dep.name + dep.specific_version.to_s, style: "filled", fillcolor: hexcolor_for_name(dep.root_name))
+        end
       end
 
       def hexcolor_for_name(string)
