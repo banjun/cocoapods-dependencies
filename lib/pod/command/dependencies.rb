@@ -121,7 +121,23 @@ module Pod
               end
 
               spec_to_deps.each do |spec, deps|
-                spec_node = graphviz_add_node(graph, spec)
+                source = spec.source
+                case source
+                when Hash
+                  source_name = source.to_s
+                else
+                  source_name = if defined?(source.name) then
+                                  source.name
+                                else
+                                  binding.pry
+                                  spec_to_deps.keys.find do |s|
+                                    s.name == spec.root.name && !s.source.nil?
+                                  end.source.name
+                                end
+                  source_name += " spec repo"
+                end
+                subgraph = graph.add_graph("cluster_#{source_name}", label: source_name)
+                spec_node = graphviz_add_node(subgraph, spec)
                 deps.each do |d|
                     dep_node = graphviz_add_node(graph, d)
                     graph.add_edge(spec_node, dep_node)
@@ -130,26 +146,6 @@ module Pod
             end
           end
         end
-      end
-
-      # Truncates the input string after a pod's name removing version requirements, etc.
-      def sanitized_pod_name(name)
-        Pod::Dependency.from_string(name).name
-      end
-
-      # Returns a Set of Strings of the names of dependencies specified in the Podfile.
-      def podfile_dependencies
-        Set.new(podfile.target_definitions.values.map { |t| t.dependencies.map { |d| d.name } }.flatten)
-      end
-
-      # Returns a [String] of the names of dependencies specified in the podspec.
-      def podspec_dependencies
-        @podspec.all_dependencies.map { |d| d.name }
-      end
-
-      # Returns a [String: [String]] containing resolved mappings from the name of a pod to an array of the names of its dependencies.
-      def pod_to_dependencies
-        dependencies.map { |d| d.is_a?(Hash) ? d : { d => [] } }.reduce({}) { |combined, individual| combined.merge!(individual) }
       end
 
       # Basename to use for output files.
@@ -175,7 +171,7 @@ module Pod
       def graphviz_add_node(graph, object)
         case object.class.to_s
         when 'Pod::Podfile::TargetDefinition'
-          graph.add_node(object.name)
+          graph.add_node(object.name, shape: "box")
         when 'Pod::Specification'
           spec = object
           graph.add_node(spec.name, label: spec.to_s, style: "filled", fillcolor: hexcolor_for_name(spec.root.name))
