@@ -114,15 +114,15 @@ module Pod
 
           unless @podspec
             podfile_dependencies.each do |pod|
-              pod_node = graph.add_node(pod)
+              pod_node = graphviz_add_node(graph, pod)
               graph.add_edge(root, pod_node)
             end
           end
 
           pod_to_dependencies.each do |pod, dependencies|
-            pod_node = graph.add_node(sanitized_pod_name(pod))
+            pod_node = graphviz_add_node(graph, pod)
             dependencies.each do |dependency|
-              dep_node = graph.add_node(sanitized_pod_name(dependency))
+              dep_node = graphviz_add_node(graph, dependency)
               graph.add_edge(pod_node, dep_node)
             end
           end
@@ -171,6 +171,20 @@ module Pod
         graphviz_data.output( :dot => "#{output_file_basename}.gv")
       end
 
+      def graphviz_add_node(graph, name)
+          name = sanitized_pod_name(name)
+          rootspec_name = name.split('/', 2).first
+          graph.add_node(name, style: "filled", fillcolor: hexcolor_for_name(rootspec_name))
+      end
+
+      def hexcolor_for_name(string)
+        require 'colorable'
+        require 'digest/sha1'
+        hash = Digest::SHA1.hexdigest(string).hex
+        hue = (hash & 0xff) / 255.0 * 359
+        sat = ((hash & 0xff00) >> 8) / 255.0 * 50 + 10
+        Colorable::Color.new(Colorable::HSB.new(hue.to_i, sat.to_i, 100)).hex
+      end
     end
   end
 end

@@ -22,4 +22,5 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "rake"
   
   spec.add_dependency "ruby-graphviz", "~> 1.2"
+  spec.add_dependency "colorable", "~> 0.2"
 end
