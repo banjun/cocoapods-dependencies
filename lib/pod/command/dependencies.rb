@@ -114,6 +114,13 @@ module Pod
         @graphviz ||= begin
           require 'graphviz'
           GraphViz::new(output_file_basename, :type => :digraph, :rankdir => 'LR').tap do |graph|
+            # insert newrank attribute that is not supported by ruby-graphviz
+            graph.graph_attrs.instance_eval {
+                @attributes['newrank'] = :GvBool
+                @data['newrank'] = GraphViz::Types::GvBool.new(true)
+            }
+            graph.set_position('graph', 'newrank', graph.graph_attrs.data['newrank'])
+
             dependencies.each do |target, spec_to_deps|
               target_node = graphviz_add_node(graph, target)
               target.non_inherited_dependencies.each do |d|
@@ -122,7 +129,7 @@ module Pod
 
               unless target.root?
                 parent_node = graphviz_add_node(graph, target.parent)
-                graph.add_edge(target_node, parent_node, color: 'gray')
+                graph.add_edge(target_node, parent_node, color: 'gray', constraint: false)
               end
 
               spec_to_deps.each do |spec, deps|
