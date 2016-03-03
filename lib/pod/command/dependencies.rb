@@ -151,6 +151,9 @@ module Pod
                 spec_node = graphviz_add_node(subgraph, spec)
                 deps.each do |d|
                     dep_node = graphviz_add_node(graph, d)
+                    next if graph.each_edge.find do |e|
+                        e.tail_node(false, false) == spec_node.id && e.head_node(false, false) == dep_node.id
+                    end != nil
                     graph.add_edge(spec_node, dep_node)
                 end
               end
