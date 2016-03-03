@@ -154,7 +154,7 @@ module Pod
                     next if graph.each_edge.find do |e|
                         e.tail_node(false, false) == spec_node.id && e.head_node(false, false) == dep_node.id
                     end != nil
-                    graph.add_edge(spec_node, dep_node)
+                    graph.add_edge(spec_node, dep_node, color: "black;0.98:#{hexcolor_for_name(spec_node.id)}")
                 end
               end
             end
