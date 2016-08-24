@@ -121,16 +121,6 @@ module Pod
             graph.set_position('graph', 'newrank', graph.graph_attrs.data['newrank'])
 
             dependencies.each do |target, spec_to_deps|
-              target_node = graphviz_add_node(graph, target)
-              target.non_inherited_dependencies.each do |d|
-                  graph.add_edge(target_node, d.name, color: 'gray')
-              end
-
-              unless target.root?
-                parent_node = graphviz_add_node(graph, target.parent)
-                graph.add_edge(target_node, parent_node, color: 'gray', constraint: false)
-              end
-
               spec_to_deps.each do |spec, deps|
                 source = spec.source
                 case source
@@ -146,8 +136,26 @@ module Pod
                                 end
                   source_name += " spec repo"
                 end
-                subgraph = graph.add_graph("cluster_#{source_name}", label: source_name)
-                spec_node = graphviz_add_node(subgraph, spec)
+
+                cluster_name = "cluster_#{source_name}"
+                subgraph = graph.get_graph(cluster_name)
+                subgraph = graph.add_graph(cluster_name, label: source_name) if subgraph.nil?
+                graphviz_add_node(subgraph, spec)
+              end
+
+              target_node = graphviz_add_node(graph, target)
+              target.non_inherited_dependencies.each do |d|
+                  graph.add_edge(target_node, d.name, color: 'gray')
+              end
+
+              unless target.root?
+                parent_node = graphviz_add_node(graph, target.parent)
+                graph.add_edge(target_node, parent_node, color: 'gray', constraint: false)
+              end
+
+              spec_to_deps.each do |spec, deps|
+                spec_node = graph.search_node(spec.name)
+
                 deps.each do |d|
                     dep_node = graphviz_add_node(graph, d)
                     next if graph.each_edge.find do |e|
@@ -187,10 +195,12 @@ module Pod
           graph.add_node(object.name, shape: "box")
         when 'Pod::Specification'
           spec = object
-          graph.add_node(spec.name, label: spec.to_s, style: "filled", fillcolor: hexcolor_for_name(spec.root.name))
+          graph.add_node(spec.name, label: "#{spec.name} (#{spec.version.to_s})", style: "filled", fillcolor: hexcolor_for_name(spec.root.name))
         when 'Pod::Dependency'
           dep = Pod::Dependency.from_string(object.name)
-          graph.add_node(dep.name + dep.specific_version.to_s, style: "filled", fillcolor: hexcolor_for_name(dep.root_name))
+          n = graph.search_node(dep.name)
+          return n unless n.nil?
+          graph.add_node(dep.name, label: dep.name + "-dep", style: "filled", fillcolor: hexcolor_for_name(dep.root_name))
         end
       end
 
