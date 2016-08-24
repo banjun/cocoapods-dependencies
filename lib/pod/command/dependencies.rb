@@ -1,6 +1,8 @@
 module Pod
   class Command
     class Dependencies < Command
+      include Command::ProjectDirectory
+
       self.summary = "Show project's dependency graph."
 
       self.description = <<-DESC
@@ -66,16 +68,12 @@ module Pod
             @ignore_lockfile || @podspec ? nil : config.lockfile
           )
 
-          integrate_targets = config.integrate_targets
-          skip_repo_update = config.skip_repo_update?
-          config.integrate_targets = false
-          config.skip_repo_update = !@repo_update
           analysis = analyzer.analyze(@repo_update || @podspec)
-          specs_by_target = analysis.specs_by_target
-          config.integrate_targets = integrate_targets
-          config.skip_repo_update = skip_repo_update
+          specs = config.with_changes(skip_repo_update: !@repo_update) do
+            analysis.specs_by_target.values.flatten(1)
+          end
 
-          deps = specs_by_target.inject({}) do |h, (target, specs)|
+          deps = analysis.specs_by_target.inject({}) do |h, (target, specs)|
             h[target] = specs.inject({}) {|h, spec| h[spec] = spec.all_dependencies; h}
             h
           end
@@ -90,6 +88,7 @@ module Pod
             platform_name, platform_version = platform.name, platform.deployment_target.to_s
             sources = SourcesManager.all.map(&:url)
             Podfile.new do
+              install! :cocoapods, integrate_targets: false
               sources.each { |s| source s }
               platform platform_name, platform_version
               pod podspec.name, podspec: podspec.defined_in_file
